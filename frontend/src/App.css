@@ -6,9 +6,23 @@
   position: absolute;
   bottom: 30px;
   width: 300px;
-  height: 300px;
   right: 30px;
 }
-video{
-    border-radius: 11px;
+video {
+  border-radius: 11px;
+}
+html,
+body {
+  height: 100%;
+}
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.content {
+  flex: 1 0 auto;
+}
+footer {
+  flex-shrink: 0;
 }

@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { IoMdCall } from "react-icons/io";
-import { FiCheck } from "react-icons/fi";
-import { FcCancel } from "react-icons/fc";
 import { useSocket } from "../context/socket";
 import { useParams } from "react-router";
 import ReactPlayer from "react-player";
@@ -9,14 +7,23 @@ import peer from "../service/peer";
 import { FaVideo } from "react-icons/fa";
 import { useNavigate } from "react-router";
 import { FiCameraOff, FiCamera } from "react-icons/fi";
-import { Container } from '@mui/material';
-import Avatar from '@mui/material/Avatar';
-import { red } from '@mui/material/colors';
+import { Container } from "@mui/material";
+import Avatar from "@mui/material/Avatar";
+import { red } from "@mui/material/colors";
 import { IoMdMic } from "react-icons/io";
 import { IoMdMicOff } from "react-icons/io";
+import Tooltip from "@mui/material/Tooltip";
+import { ImPhoneHangUp } from "react-icons/im";
+import { HiMiniUsers } from "react-icons/hi2";
+import Button from "@mui/material/Button";
+import Badge from "@mui/material/Badge";
+import UserDrawer from "../components/UserDrawer";
 
 export default function Room() {
   const socket = useSocket();
+  const navigate = useNavigate();
+  const { userid, id } = useParams();
+
   const [remoteSocketId, setremoteSocketId] = useState(null);
   const [remoteUser, setremoteUser] = useState(null);
   const [localStream, setlocalStream] = useState(null);
@@ -27,12 +34,10 @@ export default function Room() {
   const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
   const [localAudioEnabled, setLocalAudioEnabled] = useState(true);
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
-  const [userReceived, setuserReceived] = useState(false)
+  const [userReceived, setuserReceived] = useState(false);
   const [isCaller, setIsCaller] = useState(false);
-  const [callAccepted, setCallAccepted] = useState(false);
-  const navigate = useNavigate();
-
-  const { userid, id } = useParams();
+  const [openUserDrawer, setopenUserDrawer] = useState(false);
+  const [users, setusers] = useState([userid]);
 
   const handleUserCall = useCallback(async () => {
     const localuserstream = await navigator.mediaDevices.getUserMedia({
@@ -50,7 +55,9 @@ export default function Room() {
   const handleUserJoin = useCallback(({ from, email }) => {
     setremoteSocketId(from);
     setremoteUser(email);
+    setusers((prev) => [...prev, email]);
   }, []);
+
   const handleUserLeave = () => {
     socket.emit("user:hangup", { to: remoteSocketId });
     const remoteSocketIdref = remoteSocketId;
@@ -67,6 +74,7 @@ export default function Room() {
     peer.reinitializeConnection();
     navigate("/");
   };
+
   const handleIncomingCall = useCallback(
     async ({ from, offer, email }) => {
       const localuserstream = await navigator.mediaDevices.getUserMedia({
@@ -75,6 +83,7 @@ export default function Room() {
       });
       setremoteSocketId(from);
       setremoteUser(email);
+      setusers((prev) => [...prev, email]);
       setlocalStream(localuserstream);
       const ans = await peer.createAnswer(offer);
       socket.emit("call:accepted", { to: from, ans });
@@ -83,6 +92,7 @@ export default function Room() {
     },
     [socket]
   );
+
   const sendLocalStream = useCallback(() => {
     if (localStream) {
       const tracks = localStream.getTracks();
@@ -93,7 +103,6 @@ export default function Room() {
           track.enabled = localVideoEnabled;
         }
       });
-
       tracks.forEach((track) => {
         if (localAudioEnabled && track.kind === "audio") {
           peer.peer.addTrack(track, localStream);
@@ -105,14 +114,15 @@ export default function Room() {
       });
     }
   }, [localStream, localAudioEnabled, localVideoEnabled]);
+
   const handleCallAcceptance = useCallback(
     ({ from, ans }) => {
       peer.setRemoteDescription(ans);
       sendLocalStream();
-      setCallAccepted(true);
     },
     [sendLocalStream]
   );
+
   const handleNegotiationNeeded = useCallback(async () => {
     const offer = await peer.createOffer();
     socket.emit("nego:needed", { to: remoteSocketId, offer });
@@ -125,12 +135,14 @@ export default function Room() {
     },
     [socket]
   );
+
   const handleNegotiationFinal = useCallback(
     async ({ from, ans }) => {
       await peer.setRemoteDescription(ans);
     },
     [socket, peer]
   );
+
   const handleUserDisconnected = useCallback(() => {
     setUserDisconneted(true);
     if (remoteStream) {
@@ -138,6 +150,7 @@ export default function Room() {
     }
     // navigate("/")
   }, []);
+
   useEffect(() => {
     peer.peer.addEventListener("track", (e) => {
       const streams = e.streams;
@@ -170,6 +183,7 @@ export default function Room() {
     handleNegotiationFinal,
     handleUserDisconnected,
   ]);
+
   useEffect(() => {
     peer.peer.addEventListener("negotiationneeded", handleNegotiationNeeded);
     return () => {
@@ -182,134 +196,154 @@ export default function Room() {
 
   return (
     <>
-      <div className="container my-2">
-        <div className="w-75 m-auto d-flex justify-content-between align-items-center">
-          <div>
-            <h4>
+      <UserDrawer
+        open={openUserDrawer}
+        users={users}
+        toggleDrawer={() => setopenUserDrawer(false)}
+      />
+      <main className="content ">
+        <div className="container my-2">
+          <div className="w-75 m-auto d-flex justify-content-center align-items-center">
+            <h4 className="border-bottom p-2 display-5">
               Welcome To Room {id} {userid?.split("@")[0]}
             </h4>
           </div>
-          <div className="d-flex gap-3">
+        </div>
+        {localStream && (
+          <Container>
+            <div className="border rounded localvideocontainer p-2 bg-dark">
+              {localStream && (
+                <ReactPlayer
+                  playing={localVideoEnabled}
+                  muted={!localAudioEnabled}
+                  url={localStream}
+                  width={"100%"}
+                  height={"100%"}
+                />
+              )}
+              <div className="border rounded remotevideocontainer p-2 bg-dark">
+                {remoteStream && (
+                  <div className="position-relative">
+                    <ReactPlayer
+                      playing={remoteVideoEnabled}
+                      muted={!remoteAudioEnabled}
+                      url={remoteStream}
+                      width={"100%"}
+                      height={"100%"}
+                    />
+                    <div className="d-flex align-items-center position-absolute top-50 start-50 translate-middle gap-3">
+                      <button
+                        className="btn btn-outline-light btn-lg"
+                        onClick={() => {
+                          setRemoteVideoEnabled((prev) => !prev);
+                        }}
+                      >
+                        {remoteVideoEnabled ? <FiCamera /> : <FiCameraOff />}
+                      </button>
+                      <button
+                        className="btn btn-outline-light btn-lg"
+                        onClick={() => {
+                          setRemoteAudioEnabled((prev) => !prev);
+                        }}
+                      >
+                        {remoteAudioEnabled ? <IoMdMicOff /> : <IoMdMic />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Container>
+        )}
+        {userCalled && (
+          <div className="m-auto" style={{ width: "max-content" }}>
+            <button
+              className="btn btn-outline-dark btn-lg"
+              onClick={() => {
+                setLocalVideoEnabled((prev) => !prev);
+              }}
+            >
+              {localVideoEnabled ? <FiCamera /> : <FiCameraOff />}
+            </button>
+            <button
+              className="btn btn-outline-dark mx-2 my-2 btn-lg"
+              onClick={() => {
+                setLocalAudioEnabled((prev) => !prev);
+              }}
+            >
+              {localAudioEnabled ? <IoMdMicOff /> : <IoMdMic />}
+            </button>
+          </div>
+        )}
+      </main>
+      <footer>
+        <div className="container my-2 footer">
+          <div
+            className="d-flex gap-3 w-75 m-auto my-4 justify-content-center p-3 row"
+            style={{ boxShadow: "rgba(0, 0, 0, 0.04) 0px 3px 5px" }}
+          >
             {remoteSocketId && !userCalled && !userDisconneted ? (
-              <div className="d-flex gap-3">
-
+              <div
+                className="d-flex gap-3 col justify-content-center"
+                style={{ width: "max-content" }}
+              >
                 <button
                   className="btn btn-outline-danger"
                   onClick={handleUserCall}
                 >
-                  Call<IoMdCall />
+                  Call <IoMdCall />
                 </button>
-                <Avatar sx={{ bgcolor: red[600] }}>{remoteUser[0]?.toUpperCase()}</Avatar>
+                <Tooltip title={remoteUser}>
+                  <Avatar sx={{ bgcolor: red[600] }}>
+                    {remoteUser[0]?.toUpperCase()}
+                  </Avatar>
+                </Tooltip>
               </div>
             ) : (
               remoteSocketId && (
                 <button
-                  className="btn btn-outline-info"
+                  className="btn btn-outline-danger"
                   onClick={handleUserLeave}
+                  style={{ width: "max-content" }}
                 >
-                  Hang Up
+                  <ImPhoneHangUp />
                 </button>
               )
             )}
-            {(remoteSocketId && userCalled && localStream && remoteStream && !userReceived) && <>
-              <div className="d-flex gap-3">
-                <Avatar sx={{ bgcolor: red[600] }}>
-                  {remoteUser[0]?.toUpperCase()}
-                </Avatar>
-                <span>
-                  {isCaller && !callAccepted ? "calling" : ""}
-                </span>
-              </div>
-              {!isCaller && !userReceived && (
-                <button
-                  className="btn btn-outline-success"
-                  onClick={() => {
-                    setuserReceived(true);
-                    sendLocalStream();
-                  }}
-                >
-                  Receive <FaVideo />
-                </button>
-              )}
-            </>}
-          </div>
-          <div>
-
-            {remoteSocketId ? (
-              <div className="d-flex gap-3"><Avatar sx={{ bgcolor: red[600] }}>{remoteUser[0]?.toUpperCase()}</Avatar><span> Joined the room <FiCheck color="green" /></span></div>
-            ) : (
-              <span> No one is there in room <FcCancel color="red" /></span>
-            )}
-          </div>
-        </div>
-      </div>
-      {localStream &&
-        <Container>
-          <div className="border rounded localvideocontainer p-2 bg-dark">
-            {localStream && (
-              <ReactPlayer
-                playing={localVideoEnabled}
-                muted={!localAudioEnabled}
-                url={localStream}
-                width={"100%"}
-                height={"100%"}
-              />
-            )}
-            <div className="border rounded remotevideocontainer p-2 bg-dark">
-              {remoteStream && (
-                <div className="position-relative">
-                  <ReactPlayer
-                    playing={remoteVideoEnabled}
-                    muted={!remoteAudioEnabled}
-                    url={remoteStream}
-                    width={"100%"}
-                    height={"100%"}
-                  />
-                  <div className="d-flex align-items-center position-absolute top-50 start-50 translate-middle gap-3">
+            {remoteSocketId &&
+              userCalled &&
+              localStream &&
+              remoteStream &&
+              !userReceived && (
+                <>
+                  {!isCaller && !userReceived && (
                     <button
-                      className="btn btn-outline-light btn-lg"
+                      className="btn btn-outline-danger"
+                      style={{ width: "max-content" }}
                       onClick={() => {
-                        setRemoteVideoEnabled((prev) => !prev);
+                        setuserReceived(true);
+                        sendLocalStream();
                       }}
                     >
-                      {remoteVideoEnabled ? <FiCamera /> : <FiCameraOff />}
+                      Receive <FaVideo />
                     </button>
-                    <button
-                      className="btn btn-outline-light btn-lg"
-                      onClick={() => {
-                        setRemoteAudioEnabled((prev) => !prev);
-                      }}
-                    >
-                      {remoteAudioEnabled ? <IoMdMicOff /> : <IoMdMic />}
-                    </button>
-                  </div>
-                </div>
-
+                  )}
+                </>
               )}
+            <div style={{ width: "max-content" }}>
+              <Badge
+                badgeContent={users?.length > 0 && users.length}
+                color={red[600]}
+              >
+                {" "}
+                <Button className="col" onClick={() => setopenUserDrawer(true)}>
+                  <HiMiniUsers fontSize={30} color={red[600]} />
+                </Button>
+              </Badge>
             </div>
           </div>
-        </Container>
-      }
-      {userCalled && (
-        <div className="m-auto" style={{ width: "max-content" }}>
-          <button
-            className="btn btn-outline-dark btn-lg"
-            onClick={() => {
-              setLocalVideoEnabled((prev) => !prev);
-            }}
-          >
-            {localVideoEnabled ? <FiCamera /> : <FiCameraOff />}
-          </button>
-          <button
-            className="btn btn-outline-dark mx-2 my-2 btn-lg"
-            onClick={() => {
-              setLocalAudioEnabled((prev) => !prev);
-            }}
-          >
-            {localAudioEnabled ? <IoMdMicOff /> : <IoMdMic />}
-          </button>
         </div>
-      )}
+      </footer>
     </>
   );
 }
