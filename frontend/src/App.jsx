@@ -2,13 +2,42 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import { useSocket } from "./context/socket";
 import { useNavigate } from "react-router";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 function App() {
   const socket = useSocket();
   const [email, setemail] = useState("");
   const [roomId, setroomId] = useState("");
   const navigate = useNavigate();
+  const [alert, setalert] = useState({
+    open: false,
+    vertical: "top",
+    horizontal: "center",
+    message: "",
+    alertype: "info",
+  });
+  const handleClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+
+    setalert((prev) => ({
+      ...prev,
+      open: false,
+    }));
+  };
   const submitHandler = (e) => {
     e.preventDefault();
+    if (!email || !roomId) {
+      setalert({
+        open: true,
+        message: "Please enter email and room ID",
+        vertical: "top",
+        horizontal: "center",
+        alertype: "error",
+      });
+      return;
+    }
     socket.emit("user:join", { email, roomId });
   };
   useEffect(() => {
@@ -29,39 +58,84 @@ function App() {
   }, []);
 
   return (
-    <div className="container d-flex align-items-center justify-content-center" style={{height:"100vh"}}>
-      <form onSubmit={submitHandler} className="w-50 m-auto">
-        <div className="mb-3">
-          <label htmlFor="exampleInputEmail1" className="form-label">
-            Email address
-          </label>
-          <input
-            type="email"
-            className="form-control"
-            id="exampleInputEmail1"
-            aria-describedby="emailHelp"
-            value={email}
-            onChange={(e) => setemail(e.target.value)}
-          />
+    <>
+      <CustomAlert
+        open={alert.open}
+        vertical={alert.vertical}
+        horizontal={alert.horizontal}
+        alertMessage={alert.message}
+        handleClose={handleClose}
+        alertType={alert.alertype}
+      />
+      <div
+        className="container d-flex align-items-center justify-content-center"
+        style={{ height: "100vh" }}
+      >
+        <div>
+          <h3 className="display-4 border-end p-2 mx-2">
+            Video calls and meetings for everyone
+          </h3>
         </div>
-        <div className="mb-3">
-          <label htmlFor="exampleInputPassword1" className="form-label">
-            Room ID
-          </label>
-          <input
-            type="text"
-            className="form-control"
-            id="exampleInputPassword1"
-            value={roomId}
-            onChange={(e) => setroomId(e.target.value)}
-          />
-        </div>
-        <button type="submit" className="btn btn-primary">
-          Submit
-        </button>
-      </form>
-    </div>
+        <form
+          onSubmit={submitHandler}
+          className="w-50 m-auto p-3 mx-2"
+          style={{ boxShadow: " rgba(0, 0, 0, 0.08) 0px 4px 12px" }}
+        >
+          <div className="mb-3">
+            <label htmlFor="exampleInputEmail1" className="form-label">
+              Email address
+            </label>
+            <input
+              type="email"
+              className="form-control"
+              id="exampleInputEmail1"
+              aria-describedby="emailHelp"
+              value={email}
+              onChange={(e) => setemail(e.target.value)}
+            />
+          </div>
+          <div className="mb-3">
+            <label htmlFor="exampleInputPassword1" className="form-label">
+              Room ID
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              id="exampleInputPassword1"
+              value={roomId}
+              onChange={(e) => setroomId(e.target.value)}
+            />
+          </div>
+          <button type="submit" className="btn btn-primary">
+            Submit
+          </button>
+        </form>
+      </div>
+    </>
   );
 }
 
 export default App;
+
+function CustomAlert({
+  alertMessage,
+  open,
+  alertType,
+  handleClose,
+  vertical,
+  horizontal,
+}) {
+  return (
+    <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
+      <Alert
+        onClose={handleClose}
+        anchorOrigin={{ vertical, horizontal }}
+        severity={alertType}
+        variant="filled"
+        sx={{ width: "100%" }}
+      >
+        {alertMessage}
+      </Alert>
+    </Snackbar>
+  );
+}
