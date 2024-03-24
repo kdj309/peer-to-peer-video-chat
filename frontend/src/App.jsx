@@ -8,6 +8,8 @@ function App() {
   const socket = useSocket();
   const [email, setemail] = useState("");
   const [roomId, setroomId] = useState("");
+  const [availableRooms, setavailableRooms] = useState([]);
+
   const navigate = useNavigate();
   const [alert, setalert] = useState({
     open: false,
@@ -47,6 +49,12 @@ function App() {
     socket.on("room:join", ({ email, roomId }) => {
       navigate(`/room/${email}/${roomId}`);
     });
+    const getRooms = async () => {
+      const rooms = await fetch("https://probable-space-garbanzo-9w56vpjgqg92957j-3000.app.github.dev/rooms");
+      const data = await rooms.json();
+      setavailableRooms(data.rooms);
+    };
+    getRooms();
     return () => {
       socket.off("connect_error", (err) => {
         console.log(`connect_error due to ${err.message}`);
@@ -67,6 +75,25 @@ function App() {
         handleClose={handleClose}
         alertType={alert.alertype}
       />
+      {availableRooms.length ?
+        <div className="container d-flex align-items-center justify-content-center" style={{ height: "100vh" }}>
+          <div className="d-flex flex-column">
+            <h4 className="display-4">Available Rooms</h4>
+            <ul className="list-group flex-row align-items-center gap-2">
+              {availableRooms.map((room) => (
+                <li
+                  className="list-group-item"
+                  style={{ width: "max-content", cursor: "pointer" }}
+                  key={room}
+                  onClick={() => {
+                    setroomId(room);
+                  }}
+                >
+                  {room}
+                </li>
+              ))}
+            </ul></div>
+        </div> : null}
       <div
         className="container d-flex align-items-center justify-content-center"
         style={{ height: "100vh" }}

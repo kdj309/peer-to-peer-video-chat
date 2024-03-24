@@ -26,3 +26,6 @@ body {
 footer {
   flex-shrink: 0;
 }
+.maxcontent{
+  width: max-content !important;
+}

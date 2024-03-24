@@ -18,12 +18,13 @@ import { HiMiniUsers } from "react-icons/hi2";
 import Button from "@mui/material/Button";
 import Badge from "@mui/material/Badge";
 import UserDrawer from "../components/UserDrawer";
+import { TbScreenShare } from "react-icons/tb";
+import { TbScreenShareOff } from "react-icons/tb";
 
 export default function Room() {
   const socket = useSocket();
   const navigate = useNavigate();
   const { userid, id } = useParams();
-
   const [remoteSocketId, setremoteSocketId] = useState(null);
   const [remoteUser, setremoteUser] = useState(null);
   const [localStream, setlocalStream] = useState(null);
@@ -88,7 +89,7 @@ export default function Room() {
       const ans = await peer.createAnswer(offer);
       socket.emit("call:accepted", { to: from, ans });
       setuserCalled(true);
-      setIsCaller(false);
+      setIsCaller(false)
     },
     [socket]
   );
@@ -102,6 +103,10 @@ export default function Room() {
         } else if (track.kind === "video") {
           track.enabled = localVideoEnabled;
         }
+      });
+      const senders = peer.peer.getSenders();
+      senders.forEach((sender) => {
+        peer.peer.removeTrack(sender);
       });
       tracks.forEach((track) => {
         if (localAudioEnabled && track.kind === "audio") {
@@ -123,10 +128,11 @@ export default function Room() {
     [sendLocalStream]
   );
 
-  const handleNegotiationNeeded = useCallback(async () => {
+  const handleNegotiationNeeded = useCallback(async (e) => {
+
     const offer = await peer.createOffer();
     socket.emit("nego:needed", { to: remoteSocketId, offer });
-  }, [socket, remoteSocketId]);
+  }, [socket, remoteSocketId, localStream]);
 
   const handleNegotiationAcceptance = useCallback(
     async ({ from, offer }) => {
@@ -140,8 +146,9 @@ export default function Room() {
     async ({ from, ans }) => {
       await peer.setRemoteDescription(ans);
     },
-    [socket, peer]
+    [socket]
   );
+
 
   const handleUserDisconnected = useCallback(() => {
     setUserDisconneted(true);
@@ -151,13 +158,18 @@ export default function Room() {
     // navigate("/")
   }, []);
 
+
   useEffect(() => {
-    peer.peer.addEventListener("track", (e) => {
+    const handleTrack = (e) => {
       const streams = e.streams;
-      console.log("Got tracks");
+      console.log("Got tracks", streams);
       setremoteStream(streams[0]);
-    });
-  }, []);
+    };
+    peer.peer.addEventListener("track", (e) => handleTrack(e));
+    return () => {
+      peer.peer.removeEventListener("track", (e) => handleTrack(e));
+    };
+  }, [peer, localStream]);
 
   useEffect(() => {
     socket.on("user:join", handleUserJoin);
@@ -214,6 +226,7 @@ export default function Room() {
             <div className="border rounded localvideocontainer p-2 bg-dark">
               {localStream && (
                 <ReactPlayer
+                  key={localStream?.id}
                   playing={localVideoEnabled}
                   muted={!localAudioEnabled}
                   url={localStream}
@@ -221,7 +234,7 @@ export default function Room() {
                   height={"100%"}
                 />
               )}
-              <div className="border rounded remotevideocontainer p-2 bg-dark">
+              <div className="border rounded remotevideocontainer p-2 bg-dark" style={{height:!userReceived?"235px":"initial"}}>
                 {remoteStream && (
                   <div className="position-relative">
                     <ReactPlayer
@@ -256,7 +269,7 @@ export default function Room() {
           </Container>
         )}
         {userCalled && (
-          <div className="m-auto" style={{ width: "max-content" }}>
+          <div className="m-auto maxcontent" >
             <button
               className="btn btn-outline-dark btn-lg"
               onClick={() => {
@@ -284,8 +297,7 @@ export default function Room() {
           >
             {remoteSocketId && !userCalled && !userDisconneted ? (
               <div
-                className="d-flex gap-3 col justify-content-center"
-                style={{ width: "max-content" }}
+                className="d-flex gap-3 col justify-content-center maxcontent"
               >
                 <button
                   className="btn btn-outline-danger"
@@ -301,13 +313,15 @@ export default function Room() {
               </div>
             ) : (
               remoteSocketId && (
-                <button
-                  className="btn btn-outline-danger"
-                  onClick={handleUserLeave}
-                  style={{ width: "max-content" }}
-                >
-                  <ImPhoneHangUp />
-                </button>
+                <>
+                  <button
+                    className="btn btn-outline-danger maxcontent"
+                    onClick={handleUserLeave}
+                  >
+                    <ImPhoneHangUp />
+                  </button>
+
+                </>
               )
             )}
             {remoteSocketId &&
@@ -318,8 +332,7 @@ export default function Room() {
                 <>
                   {!isCaller && !userReceived && (
                     <button
-                      className="btn btn-outline-danger"
-                      style={{ width: "max-content" }}
+                      className="btn btn-outline-danger maxcontent"
                       onClick={() => {
                         setuserReceived(true);
                         sendLocalStream();
@@ -330,12 +343,11 @@ export default function Room() {
                   )}
                 </>
               )}
-            <div style={{ width: "max-content" }}>
+            <div className="maxcontent">
               <Badge
                 badgeContent={users?.length > 0 && users.length}
                 color={red[600]}
               >
-                {" "}
                 <Button className="col" onClick={() => setopenUserDrawer(true)}>
                   <HiMiniUsers fontSize={30} color={red[600]} />
                 </Button>

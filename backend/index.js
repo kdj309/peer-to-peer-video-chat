@@ -7,6 +7,7 @@ const server = createServer(app);
 const bodyParser = require("body-parser");
 app.use(cors());
 app.use(bodyParser.json());
+const rooms=[];
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -17,6 +18,11 @@ app.get("/", (req, res) => {
     message: "Hello World",
   });
 });
+app.get("/rooms", (req, res) => {
+  return res.status(200).json({
+    rooms: [...new Set(rooms)],
+  });
+});
 const emailtoSocketIdMap = new Map();
 const SocketIdToEmailMap = new Map();
 io.on("connection", (socket) => {
@@ -24,6 +30,7 @@ io.on("connection", (socket) => {
   socket.on("user:join", ({ email, roomId }) => {
     emailtoSocketIdMap.set(email, socket.id);
     SocketIdToEmailMap.set(socket.id, email);
+    rooms.push(roomId)
     io.to(roomId).emit("user:join", { from: socket.id, email });
     socket.join(roomId);
     io.to(socket.id).emit("room:join", { email, roomId });
@@ -37,11 +44,11 @@ io.on("connection", (socket) => {
     io.to(to).emit("call:accepted", { from: socket.id, ans })
   })
   socket.on("nego:needed", ({ to, offer }) => {
-    console.log(`Negotiation Request to ${to} it contains ${offer}`)
+    console.log(`Negotiation Request to ${to} it contains ${(offer)}`)
     io.to(to).emit("nego:accept", { from: socket.id, offer })
   })
   socket.on("nego:final", ({ to, ans }) => {
-    console.log(`Negotiation Final step to ${to} it contains ${ans}`)
+    console.log(`Negotiation Final step to ${to} it contains ${(ans)}`)
     io.to(to).emit("nego:final", { from: socket.id, ans })
   })
   socket.on("user:hangup", ({ to }) => {
