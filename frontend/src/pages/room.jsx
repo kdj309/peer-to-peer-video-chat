@@ -39,6 +39,8 @@ export default function Room() {
   const [isCaller, setIsCaller] = useState(false);
   const [openUserDrawer, setopenUserDrawer] = useState(false);
   const [users, setusers] = useState([userid]);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState(null);
 
   const handleUserCall = useCallback(async () => {
     const localuserstream = await navigator.mediaDevices.getUserMedia({
@@ -64,6 +66,9 @@ export default function Room() {
     const remoteSocketIdref = remoteSocketId;
     if (localStream) {
       localStream.getTracks().forEach((track) => track.stop());
+    }
+    if (screenStream) {
+      screenStream.getTracks().forEach((track) => track.stop());
     }
     peer.peer.close();
     setlocalStream(null);
@@ -129,7 +134,6 @@ export default function Room() {
   );
 
   const handleNegotiationNeeded = useCallback(async (e) => {
-
     const offer = await peer.createOffer();
     socket.emit("nego:needed", { to: remoteSocketId, offer });
   }, [socket, remoteSocketId, localStream]);
@@ -149,15 +153,42 @@ export default function Room() {
     [socket]
   );
 
-
   const handleUserDisconnected = useCallback(() => {
     setUserDisconneted(true);
     if (remoteStream) {
       remoteStream.getTracks().forEach((track) => track.stop());
     }
-    // navigate("/")
   }, []);
 
+  const handleScreenShare = useCallback(async () => {
+    if (!isScreenSharing) {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+      });
+      stream.getVideoTracks()[0].onended = () => {
+        handleScreenShareStop();
+      };
+      setScreenStream(stream);
+      const sender = peer.peer.getSenders().find(s => s.track.kind === 'video');
+      sender.replaceTrack(stream.getVideoTracks()[0]);
+      setIsScreenSharing(true);
+    } else {
+      handleScreenShareStop();
+    }
+  }, [isScreenSharing]);
+
+  const handleScreenShareStop = useCallback(() => {
+    const sender = peer.peer.getSenders().find(s => s.track.kind === 'video');
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (sender && videoTrack) {
+      sender.replaceTrack(videoTrack);
+    }
+    if (screenStream) {
+      screenStream.getTracks().forEach((track) => track.stop());
+    }
+    setScreenStream(null);
+    setIsScreenSharing(false);
+  }, [localStream, screenStream]);
 
   useEffect(() => {
     const handleTrack = (e) => {
@@ -213,7 +244,7 @@ export default function Room() {
         users={users}
         toggleDrawer={() => setopenUserDrawer(false)}
       />
-      <main className="content ">
+      <main className="content">
         <div className="container my-2">
           <div className="w-75 m-auto d-flex justify-content-center align-items-center">
             <h4 className="border-bottom p-2 display-5">
@@ -234,7 +265,7 @@ export default function Room() {
                   height={"100%"}
                 />
               )}
-              <div className="border rounded remotevideocontainer p-2 bg-dark" style={{height:!userReceived?"235px":"initial"}}>
+              <div className="border rounded remotevideocontainer p-2 bg-dark" style={{ height: !userReceived ? "235px" : "initial" }}>
                 {remoteStream && (
                   <div className="position-relative">
                     <ReactPlayer
@@ -269,7 +300,7 @@ export default function Room() {
           </Container>
         )}
         {userCalled && (
-          <div className="m-auto maxcontent" >
+          <div className="m-auto maxcontent">
             <button
               className="btn btn-outline-dark btn-lg"
               onClick={() => {
@@ -286,6 +317,12 @@ export default function Room() {
             >
               {localAudioEnabled ? <IoMdMicOff /> : <IoMdMic />}
             </button>
+            <button
+              className="btn btn-outline-dark btn-lg"
+              onClick={handleScreenShare}
+            >
+              {isScreenSharing ? <TbScreenShareOff /> : <TbScreenShare />}
+            </button>
           </div>
         )}
       </main>
@@ -296,9 +333,7 @@ export default function Room() {
             style={{ boxShadow: "rgba(0, 0, 0, 0.04) 0px 3px 5px" }}
           >
             {remoteSocketId && !userCalled && !userDisconneted ? (
-              <div
-                className="d-flex gap-3 col justify-content-center maxcontent"
-              >
+              <div className="d-flex gap-3 col justify-content-center maxcontent">
                 <button
                   className="btn btn-outline-danger"
                   onClick={handleUserCall}
@@ -320,7 +355,6 @@ export default function Room() {
                   >
                     <ImPhoneHangUp />
                   </button>
-
                 </>
               )
             )}

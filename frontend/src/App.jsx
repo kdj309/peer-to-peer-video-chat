@@ -50,7 +50,7 @@ function App() {
       navigate(`/room/${email}/${roomId}`);
     });
     const getRooms = async () => {
-      const rooms = await fetch("https://probable-space-garbanzo-9w56vpjgqg92957j-3000.app.github.dev/rooms");
+      const rooms = await fetch("http://192.168.1.6:3000/rooms");
       const data = await rooms.json();
       setavailableRooms(data.rooms);
     };

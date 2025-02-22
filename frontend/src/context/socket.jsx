@@ -7,7 +7,7 @@ function useSocket() {
 export { useSocket };
 function SocketProvider({ children }) {
   const socket = useMemo(() => {
-    const socketinstance = io("https://probable-space-garbanzo-9w56vpjgqg92957j-3000.app.github.dev/");
+    const socketinstance = io("http://192.168.1.6:3000/");
     return socketinstance;
   });
   return (
